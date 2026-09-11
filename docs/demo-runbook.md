@@ -17,8 +17,9 @@ uv run --native-tls streamlit run app.py
 ## 1. The problem (30 s)
 
 Show page 5 of the PDF in the viewer: a scan, no text layer, the auto clause buried under a sub-heading on
-page 5 of 8. Say: *200 million of these; most are scans; nobody can answer a portfolio question without
-opening them one by one. 17 of our 19 example documents have no text layer at all.*
+page 5 of 8. Say: *200 million of these; most are text PDFs, but a long tail are scans like this one — 17 of our
+19 examples have no text layer at all — and nobody can answer a portfolio question without opening them one by
+one. The pipeline has to cope with the worst case, so the prototype reads every page as an image.*
 
 ## 2. Ask (60 s) — tab **Ask**
 
@@ -26,7 +27,7 @@ Question (pre-filled):
 
 > Find all liability policies with excess auto cover in the United States. Show attachment point and limit.
 
-Expected table — 4 rows, none flagged:
+Expected table — 4 rows, one flagged ⚠️ (LP0000036557-30, see step 3):
 
 | Policy | Period | Attachment | Limit |
 |---|---|---|---|
@@ -50,8 +51,10 @@ Four evidenced values, each with page, confidence, verbatim quote and the page i
 Say: *every number has a page. The limit comes from the sum-insured table because the auto extension has no
 sublimit of its own — the app says so rather than guessing.*
 
-Then pick `LP0000036557-30` and show the note: the US cover is **restricted to travellers from abroad**. The
-system lists it *with* the restriction visible instead of silently dropping it — an underwriter decides.
+Then pick `LP0000036557-30` — the ⚠️ row. It is flagged **Needs review** with the reason *"US excess auto cover is
+restricted: No excess auto cover in USA is given, except for people travelling from abroad…"* (p. 8). The system
+lists it *with* the restriction, and puts it on the review list instead of either dropping it or presenting the
+USD 1,000,000 attachment as a clean fact — an underwriter decides.
 
 Flagged example: in the Evidence document picker choose `LP0000068085-1` (a transport policy). It is a
 correct negative but flagged **Needs review** because the model gave no quote for the absence — the flag is
@@ -95,12 +98,15 @@ Expected: *"Can't answer that from the index: The index has no broker field"* pl
 Read the measured numbers first (they come from `ingest_metrics`, not from a slide): 19 documents, 226 pages,
 p50 27 s/doc, ≈ $0.18/doc API-equivalent through the CLI. Then the extrapolation rows:
 
-- Measured path × 200 M docs ≈ $17.9 M — *honest, and it includes Claude Code's prompt overhead.*
-- Vision on page images via the API ≈ $4.0 M.
-- OCR once + text extraction ≈ $4.8 M (OCR dominates) — *and OCR gives exact highlight boxes.*
+- Measured path × 200 M docs ≈ $17.9 M — *honest, but an upper bound: every page read as an image because the
+  examples are 17/19 scans, plus Claude Code's prompt overhead.*
+- Prototype path (every page as an image) via the API ≈ $4.0 M.
+- Production path ≈ $2.3 M: text PDFs give up their text layer for free, only the scanned 20 % is OCR'd
+  (≈ $0.7 M), then text-only extraction (≈ $1.6 M) — *and text + layout gives exact highlight boxes.*
 
-Move the **Share passing Stage 0 triage** slider to 0.2: everything divides by five. Say: *the archive is read
-once; queries never re-read it. Throughput is a batch/parallelism question, not an architecture question.*
+Drag **Share of archive that is scanned** to 1.0 to show the old assumption: OCR alone becomes ≈ $3.6 M. Then
+move **Share passing Stage 0 triage** to 0.2: everything divides by five. Say: *the archive is read once; queries
+never re-read it. Throughput is a batch/parallelism question, not an architecture question.*
 
 Close with the eval line: **precision 1.00, recall 1.00, attachment 4/4, limit 4/4** against a labelled
 ground truth (`eval/ground_truth.csv`), reproducible with one command.

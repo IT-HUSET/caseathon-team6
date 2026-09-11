@@ -48,22 +48,28 @@ def extrapolate(a: dict[str, Any], model: str, measured_cost_per_doc: float | No
     docs = a["corpus_documents"] * a["prefilter_share"]
     pages = docs * a["avg_pages_per_doc"]
 
-    # Prototype path: vision reading of every page image.
+    # Prototype path: vision reading of every page image, scan or not.
     tokens_in_vision = a["avg_pages_per_doc"] * a["tokens_per_page_image"]
     cost_vision_doc = (tokens_in_vision * price_in + a["output_tokens_per_doc"] * price_out) / 1e6
     cost_vision_doc *= (1 - a["batch_discount"])
 
-    # Stage 1+2 path: OCR once, then text-only extraction.
-    cost_ocr_doc = a["avg_pages_per_doc"] * a["ocr_cost_per_1000_pages"] / 1000
-    cost_text_doc = (a["text_tokens_per_doc"] * price_in + a["output_tokens_per_doc"] * price_out) / 1e6
+    # Production path (Stage 1+2): text PDFs give up their text layer for free;
+    # only the scanned share is OCR'd. Extraction is then text-only for every document.
+    tokens_in_text = a["avg_pages_per_doc"] * a["text_tokens_per_page"]
+    cost_text_doc = (tokens_in_text * price_in + a["output_tokens_per_doc"] * price_out) / 1e6
     cost_text_doc *= (1 - a["batch_discount"])
+    cost_ocr_scan = a["avg_pages_per_doc"] * a["ocr_cost_per_1000_pages"] / 1000   # per scanned doc
+    cost_ocr_doc = cost_ocr_scan * a["scan_share"]                                  # averaged over the corpus
 
     return {
         "documents_read": docs,
         "pages_read": pages,
+        "scanned_documents": docs * a["scan_share"],
         "vision": {"per_doc": cost_vision_doc, "total": cost_vision_doc * docs,
                    "tokens_per_doc": tokens_in_vision + a["output_tokens_per_doc"]},
-        "ocr_text": {"ocr_per_doc": cost_ocr_doc, "llm_per_doc": cost_text_doc,
+        "ocr_text": {"ocr_per_doc": cost_ocr_doc, "ocr_per_scanned_doc": cost_ocr_scan,
+                     "llm_per_doc": cost_text_doc,
+                     "tokens_per_doc": tokens_in_text + a["output_tokens_per_doc"],
                      "ocr_total": cost_ocr_doc * docs, "llm_total": cost_text_doc * docs,
                      "total": (cost_ocr_doc + cost_text_doc) * docs},
         "measured": None if measured_cost_per_doc is None else {

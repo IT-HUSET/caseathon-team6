@@ -11,7 +11,7 @@
 
 ## 1. Problem
 
-If Industrial holds ~200 million documents (policies, wordings, schedules, correspondence) in many formats and languages. Valuable facts — cover types, geography, attachment points, limits, layer structures — are locked inside free text, often in scanned PDFs with no text layer. Existing metadata is not sufficient to answer portfolio questions such as *"which of our liability policies carry excess auto cover in the US, and at what attachment point and limit?"* Today that question means an underwriter opening documents one by one.
+If Industrial holds ~200 million documents (policies, wordings, schedules, correspondence) in many formats and languages. Valuable facts — cover types, geography, attachment points, limits, layer structures — are locked inside free text — most often in text-based PDFs, with a long tail of scanned documents that have no text layer at all. Existing metadata is not sufficient to answer portfolio questions such as *"which of our liability policies carry excess auto cover in the US, and at what attachment point and limit?"* Today that question means an underwriter opening documents one by one.
 
 The caseathon asks for a working prototype that shows how such an archive becomes an **active, trustworthy knowledge source**: natural-language search over content, analysis/aggregation, format-agnostic handling, and results whose sources are explicit — designed so that the approach plausibly scales to 200M documents, not just a demo set.
 
@@ -50,7 +50,7 @@ The caseathon asks for a working prototype that shows how such an archive become
 
 | # | Finding | Consequence |
 |---|---|---|
-| F1 | **17 of the 19 example PDFs have no text layer** (scans). Only the two 2022-06-08 Danfoss files are text PDFs. | OCR/vision is mandatory on the main path, not a fallback. |
+| F1 | **17 of the 19 example PDFs have no text layer** (scans); only the two 2022-06-08 Danfoss files are text PDFs. The example set is *not* representative here: the real archive is assumed to be mostly text-based PDFs (working assumption: ~20 % scans, editable on the Scale tab). | The prototype must handle scans on its main path, so it reads page images for every document. At scale the text layer is the cheap default and OCR is paid only on the scanned share (§10). |
 | F2 | Documents are 2–85 pages (median ~6); mixed languages (EN, DA, FI, SV observed); personal/company identifiers partly redacted (black boxes). | Chunked page processing; extraction must tolerate `null` policyholder. |
 | F3 | Semi-structured header on page 1 (Policy no. `LP…`, Client no. `LC…`, period, print date) followed by free-text cover descriptions. | Header fields are reliable anchors; cover facts need reading, not regex. |
 | F4 | No Anthropic API key or `ant` CLI on the build machine; only the `claude` CLI under a Claude Code Pro subscription (OAuth login). `ANTHROPIC_BASE_URL` is set but points at the default `https://api.anthropic.com` — no proxy, so the measured timings in F6 are representative and Pro-plan rate limits are the only throttle. | LLM calls go through `claude -p` (headless). Zero marginal cost, but rate-limited and not a production pattern. |
@@ -90,7 +90,7 @@ Components (all Python, single repo):
 Each requirement has acceptance criteria (AC). "Must" = required for the demo; "Should" = do if time permits; "Stretch" = only if everything else is green.
 
 ### FR-1 Ingestion of heterogeneous PDFs — Must
-- Ingests every PDF under a configurable root; text PDFs and scans go through the **same** page-image path (no branching logic to maintain).
+- Ingests every PDF under a configurable root; text PDFs and scans go through the **same** page-image path (no branching logic to maintain in the prototype — the example set is 17/19 scans, so this is the path that has to work; the text-layer fast path is a §10 production optimisation).
 - Pages rasterised at a scale that keeps small print legible (start at 1.5×; ~1,200 px wide) and saved for the UI.
 - Documents longer than 15 pages are processed in chunks of ≤15 pages; chunk results are merged per document (first non-null wins for header fields; cover facts union with their evidence).
 - Idempotent: re-running skips documents whose file hash is already indexed; `--force` re-ingests.
@@ -210,7 +210,7 @@ The prototype is deliberately built as the small end of a pipeline whose cost pr
 
 **Stage 0 — Triage on existing metadata (no LLM).** Product line, document type, date, language from existing metadata and filenames route documents to the right extraction schema and exclude irrelevant ones. Even a weak pre-filter (e.g. only liability policies for Q1) cuts the LLM-read population by an order of magnitude.
 
-**Stage 1 — OCR once, store text + layout.** At archive scale, vision-LLM reading of every page is the expensive path. Run a dedicated OCR (Azure Document Intelligence, AWS Textract, or open-source on GPU) once per page; store text with bounding boxes. This yields exact highlight coordinates (what FR-6 approximates) and makes later extraction a text task.
+**Stage 1 — Get text once, store text + layout.** Most of the archive is text-based PDFs: their text layer (with character positions) is extracted for free with `pypdfium2`. Only the scanned share (assumed ~20 %; the two Danfoss examples show what a text PDF looks like, the other 17 what a scan looks like) goes through a dedicated OCR (Azure Document Intelligence, AWS Textract, or open-source on GPU) once per page. Either way the store holds text with bounding boxes, which yields exact highlight coordinates (what FR-6 approximates) and makes later extraction a text task. Vision-LLM reading of every page — the prototype path — is the expensive fallback, not the default.
 
 **Stage 2 — Schema extraction with a small model, batched.** Text-only extraction with Haiku-class models via the Batch API (50 % discount), asynchronous, resumable, keyed by document hash. Extraction prompt = the schema in §7 with evidence quotes required, exactly as in the prototype. Escalate only low-confidence documents to a larger model.
 
@@ -223,11 +223,15 @@ The prototype is deliberately built as the small end of a pipeline whose cost pr
 | Assumption | Value |
 |---|---|
 | Documents / avg pages | 200 M / 8 → 1.6 B pages |
-| Prototype path (vision, ~1,500 tokens per page image + ~400 output tokens/doc) | ~12.4 k tokens/doc |
-| Sonnet 5 at $2 / $10 per 1M tokens, Batch −50 % | ≈ $0.014 / doc → **≈ $2.8 M** for the full corpus |
-| Haiku 4.5 at $1 / $5 per 1M, Batch −50 % | ≈ $0.007 / doc → **≈ $1.4 M** |
-| With Stage 0 triage keeping 20 % of corpus | **≈ $0.3–0.6 M** |
-| Stage 1 OCR (≈ $1.5 per 1,000 pages) + text-only Haiku extraction (~4 k tokens/doc) | OCR ≈ $2.4 M one-off (dominant), LLM ≈ $0.4 M |
+| Share of archive that is scanned (no text layer) | 20 % → 40 M documents / 320 M pages need OCR |
+| Prototype path (every page as an image, ~1,500 tokens per page + ~400 output tokens/doc) | ~12.4 k tokens/doc |
+| Production path (text layer or OCR text, ~500 tokens per page + ~400 output tokens/doc) | ~4.4 k tokens/doc |
+| Prototype path, Sonnet 5 at $2 / $10 per 1M tokens, Batch −50 % | ≈ $0.014 / doc → **≈ $2.8 M** for the full corpus |
+| Prototype path, Haiku 4.5 at $1 / $5 per 1M, Batch −50 % | ≈ $0.007 / doc → **≈ $1.4 M** |
+| Production path, Sonnet 5: LLM ≈ $0.006 / doc + OCR (≈ $1.5 per 1,000 pages) ≈ $0.012 per *scanned* doc | LLM ≈ $1.2 M + OCR ≈ $0.5 M → **≈ $1.7 M** (≈ $0.008 / doc blended) |
+| Production path, Haiku 4.5 | LLM ≈ $0.6 M + OCR ≈ $0.5 M → **≈ $1.1 M** |
+| With Stage 0 triage keeping 20 % of corpus | **≈ $0.2–0.35 M** |
+| Same production path if the archive were *all* scans (the old assumption) | OCR ≈ $2.4 M dominates → ≈ $3.0–3.6 M |
 
 Point of the table: **the archive is read once**; a query costs cents regardless of corpus size. Throughput is a parallelism/batch question, not an architecture question. Price inputs are the September 2026 Anthropic list prices and must be re-checked before any real business case.
 
@@ -259,12 +263,12 @@ Cut order if behind: FR-6 (already stretch) → FR-4 follow-up chat reduced to c
 
 ## 13. Demo script (≈5 minutes)
 
-1. **The problem in one sentence** — 200M documents, most of them scans, and a real underwriter question nobody can answer today. Show a scanned page (redacted) to make "no text layer" concrete.
+1. **The problem in one sentence** — 200M documents, mostly text PDFs but with a long tail of scans, and a real underwriter question nobody can answer today. Show a scanned page (redacted) to make "no text layer" concrete — the pipeline has to cope with the worst case.
 2. **Ask** — type the Q1 question in English. Table appears. Point at attachment point, limit, currency, confidence.
 3. **Trust** — click a row: page image + quoted sentence. "Every number has a page." Show a flagged row and why it's flagged.
 4. **Analyse** — follow-up: sum limits by currency; ask the same question in Swedish.
 5. **Scale** — Scale tab: measured seconds/tokens/cost per document from *this* run → extrapolate; explain extract-once/query-many and the four stages. Show the eval numbers (precision/recall vs our ground truth).
-6. **What's next** — Q2/Q3 are new fields in the same schema; OCR + batch for the real archive; underwriter corrections feeding back.
+6. **What's next** — Q2/Q3 are new fields in the same schema; text-layer fast path + OCR for the scanned share + batch for the real archive; underwriter corrections feeding back.
 
 ## 14. Open questions
 

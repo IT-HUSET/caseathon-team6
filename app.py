@@ -162,39 +162,50 @@ with tab_scale:
         a = {
             "corpus_documents": st.number_input("Documents in archive", value=d["corpus_documents"], step=10_000_000),
             "avg_pages_per_doc": st.number_input("Avg pages / doc", value=float(m["pages_mean"] or d["avg_pages_per_doc"]), step=1.0),
+            "scan_share": st.slider("Share of archive that is scanned (no text layer)", 0.0, 1.0, d["scan_share"], 0.05,
+                                    help="The 19 examples are 17/19 scans; the real archive is assumed mostly text PDFs."),
             "prefilter_share": st.slider("Share passing Stage 0 triage", 0.05, 1.0, d["prefilter_share"], 0.05),
             "batch_discount": st.slider("Batch API discount", 0.0, 0.5, d["batch_discount"], 0.05),
-            "tokens_per_page_image": st.number_input("Tokens / page image", value=d["tokens_per_page_image"], step=100),
+            "tokens_per_page_image": st.number_input("Tokens / page image (prototype path)", value=d["tokens_per_page_image"], step=100),
+            "text_tokens_per_page": st.number_input("Tokens / page of text (production path)", value=d["text_tokens_per_page"], step=50),
             "output_tokens_per_doc": st.number_input("Output tokens / doc", value=d["output_tokens_per_doc"], step=50),
-            "ocr_cost_per_1000_pages": st.number_input("OCR cost / 1,000 pages ($)", value=d["ocr_cost_per_1000_pages"], step=0.1),
-            "text_tokens_per_doc": st.number_input("Text tokens / doc after OCR", value=d["text_tokens_per_doc"], step=500),
+            "ocr_cost_per_1000_pages": st.number_input("OCR cost / 1,000 scanned pages ($)", value=d["ocr_cost_per_1000_pages"], step=0.1),
         }
         model = st.selectbox("Model (list price)", list(config.MODEL_PRICES_PER_MTOK),
                              index=list(config.MODEL_PRICES_PER_MTOK).index(config.MODEL)
                              if config.MODEL in config.MODEL_PRICES_PER_MTOK else 0)
     with right:
         x = scale.extrapolate(a, model, m["cost_per_doc"])
-        st.markdown(f"Documents read after triage: **{x['documents_read']:,.0f}** · pages: **{x['pages_read']:,.0f}**")
+        st.markdown(f"Documents read after triage: **{x['documents_read']:,.0f}** · pages: **{x['pages_read']:,.0f}** · "
+                    f"of which scanned documents needing OCR: **{x['scanned_documents']:,.0f}**")
         rows = [
-            {"Path": f"Prototype path — vision on page images ({model})",
+            {"Path": f"Prototype path — every page as an image ({model})",
              "Per doc": scale.fmt_usd(x["vision"]["per_doc"]), "Full corpus": scale.fmt_usd(x["vision"]["total"])},
-            {"Path": f"Stage 1 OCR once + Stage 2 text extraction ({model})",
-             "Per doc": scale.fmt_usd(x["ocr_text"]["ocr_per_doc"] + x["ocr_text"]["llm_per_doc"]),
+            {"Path": f"Production path — text layer, OCR only the scanned share, text extraction ({model})",
+             "Per doc": f"{scale.fmt_usd(x['ocr_text']['ocr_per_doc'] + x['ocr_text']['llm_per_doc'])}  "
+                        f"(scanned doc {scale.fmt_usd(x['ocr_text']['ocr_per_scanned_doc'] + x['ocr_text']['llm_per_doc'])}, "
+                        f"text doc {scale.fmt_usd(x['ocr_text']['llm_per_doc'])})",
              "Full corpus": f"{scale.fmt_usd(x['ocr_text']['total'])}  (OCR {scale.fmt_usd(x['ocr_text']['ocr_total'])} + LLM {scale.fmt_usd(x['ocr_text']['llm_total'])})"},
         ]
         if x["measured"]:
-            rows.insert(0, {"Path": "Measured cost/doc from this run × corpus (with batch discount)",
+            rows.insert(0, {"Path": "Measured on this run × corpus (with batch discount) — upper bound: "
+                                    "prototype path, every page as an image (the examples are 17/19 scans), and the "
+                                    "headless CLI reads each page in a separate turn and re-sends context, "
+                                    "~3–4× the tokens of one API call carrying all page images",
                             "Per doc": scale.fmt_usd(x["measured"]["per_doc"]),
                             "Full corpus": scale.fmt_usd(x["measured"]["total"])})
-        st.table(pd.DataFrame(rows))
-        st.caption("List prices Sept 2026 (PRD s10); re-check before any business case. A query costs cents regardless of corpus size.")
+        # st.table renders markdown: a cell with two "$" would be parsed as LaTeX.
+        st.table(pd.DataFrame(rows).replace(r"\$", r"\\$", regex=True))
+        st.caption("List prices Sept 2026 (PRD s10); re-check before any business case. The measured row is the "
+                   "prototype's dev-time cost profile (Claude Code CLI, multi-turn); the two modelled rows are what "
+                   "the same prompt costs on the API / Batch API. A query costs cents regardless of corpus size.")
 
     st.subheader("Why this scales: extract once, query many")
     st.markdown(
         "- **Stage 0 — triage on existing metadata (no LLM).** Product line, document type, date and language "
         "route documents to the right schema and drop irrelevant ones.\n"
-        "- **Stage 1 — OCR once, store text + layout.** Vision reading of every page is the expensive path; "
-        "dedicated OCR yields text with exact bounding boxes.\n"
+        "- **Stage 1 — get text once, store text + layout.** Most of the archive is text PDFs whose text layer is "
+        "free; only the scanned share goes through dedicated OCR, which also yields exact bounding boxes.\n"
         "- **Stage 2 — schema extraction with a small model, batched.** Same prompt and schema as this prototype, "
         "via the Batch API; escalate only low-confidence documents.\n"
         "- **Stage 3 — index.** Facts + evidence in a columnar store; queries hit the index, the LLM only translates "

@@ -36,7 +36,8 @@ QUERY_FIELDS: dict[str, tuple[str, str, str]] = {
     "ea_limit_amount":        ("ea_limit_amount", "number", "Excess auto limit amount"),
     "ea_limit_currency":      ("ea_limit_currency", "text", "Currency of the limit (ISO code)"),
     "ea_basis":               ("ea_basis", "text", "Basis of the limit, e.g. 'per occurrence'"),
-    "needs_review":           ("needs_review", "bool", "True when any value is low-confidence or unevidenced"),
+    "ea_us_restriction":      ("ea_us_restriction", "text", "Restriction on the US excess auto cover as worded in the policy, or null when unrestricted"),
+    "needs_review":           ("needs_review", "bool", "True when any value is low-confidence or unevidenced, or the US excess auto cover is restricted"),
 }
 
 # Always shown in a result table regardless of what the question asked for (FR-3).
@@ -112,6 +113,7 @@ EXTRACTION_EXAMPLE: dict[str, Any] = {
         "limit_currency": "EUR",
         "basis": "per occurrence",
         "notes": "applies to owned/hired/non-owned autos in USA; limit_source: total sum insured",
+        "us_scope_restriction": None,   # e.g. "No excess auto cover in USA is given, except for people travelling from abroad"
         "evidence_page": 8,
         "evidence_quote": "The insurance covers ... in excess of USD 1,000,000 ...",
         "confidence": "high",

@@ -38,15 +38,19 @@ MODEL = os.environ.get("PI_MODEL", "claude-sonnet-5")
 CLI_TIMEOUT_S = int(os.environ.get("PI_CLI_TIMEOUT_S", "600"))
 
 # --- Scale tab defaults (PRD s10; list prices Sept 2026 - re-check before use) ---
+# The example corpus is 17/19 scans, but the real archive is assumed to be mostly
+# text PDFs: only `scan_share` of documents need OCR, the rest yield their text
+# layer for free. Every value is editable on the Scale tab.
 SCALE_DEFAULTS = {
     "corpus_documents": 200_000_000,
     "avg_pages_per_doc": 8.0,
-    "tokens_per_page_image": 1_500,
+    "scan_share": 0.2,               # share of documents with no text layer (need OCR)
+    "tokens_per_page_image": 1_500,  # prototype path: every page as an image
+    "text_tokens_per_page": 500,     # production path: text layer / OCR output
     "output_tokens_per_doc": 400,
     "batch_discount": 0.5,
     "prefilter_share": 1.0,          # share of corpus that passes Stage 0 triage
-    "ocr_cost_per_1000_pages": 1.5,
-    "text_tokens_per_doc": 4_000,    # Stage 1+2 path: OCR text instead of images
+    "ocr_cost_per_1000_pages": 1.5,  # paid on scanned pages only
 }
 
 MODEL_PRICES_PER_MTOK = {            # (input, output) USD per 1M tokens

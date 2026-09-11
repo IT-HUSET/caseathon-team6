@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS policy_facts (
     ea_limit_currency       TEXT,
     ea_basis                TEXT,
     ea_notes                TEXT,
+    ea_us_restriction       TEXT,                   -- restriction on US excess auto cover, as worded; NULL = unrestricted
     needs_review            INTEGER NOT NULL DEFAULT 0,
     review_reasons          TEXT                    -- JSON list of strings
 );
@@ -94,7 +95,12 @@ FACT_COLUMNS = [
     "policy_no", "client_no", "policyholder", "period_start", "period_end", "language",
     "product_line", "geography_scope", "geography_us", "has_excess_auto",
     "ea_attachment_amount", "ea_attachment_currency", "ea_limit_amount", "ea_limit_currency",
-    "ea_basis", "ea_notes", "needs_review", "review_reasons",
+    "ea_basis", "ea_notes", "ea_us_restriction", "needs_review", "review_reasons",
+]
+
+# Columns added after the first release; applied to existing databases on connect().
+MIGRATIONS = [
+    ("policy_facts", "ea_us_restriction", "ALTER TABLE policy_facts ADD COLUMN ea_us_restriction TEXT"),
 ]
 
 
@@ -110,6 +116,10 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     except sqlite3.OperationalError:
         pass  # another worker is switching the mode right now; the default journal is fine
     conn.executescript(SCHEMA)
+    for table, column, ddl in MIGRATIONS:
+        if column not in {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}:
+            conn.execute(ddl)
+    conn.commit()
     return conn
 
 

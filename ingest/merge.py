@@ -5,7 +5,8 @@ Rules from the PRD:
 - cover facts: union with their evidence; a positive `has_excess_auto_liability`
   from any chunk wins over false/null, and the chunk that stated it supplies the figures
 - needs_review when: any displayed value is `low`, a non-null value has no evidence
-  quote, or any chunk failed extraction
+  quote, any chunk failed extraction, or the US excess auto cover carries a scope
+  restriction (`excess_auto.us_scope_restriction`)
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ EXCESS_AUTO_FIELDS = {
     "limit_currency": "ea_limit_currency",
     "basis": "ea_basis",
     "notes": "ea_notes",
+    "us_scope_restriction": "ea_us_restriction",
 }
 
 # Fields whose evidence/confidence decide the review flag (the "displayed values").
@@ -113,6 +115,9 @@ def merge_chunks(chunks: list[ChunkResult]) -> tuple[dict[str, Any], list[dict[s
             evidence.append(_evidence_row("excess_auto_limit", lim))
         if any(ea_src.get(k) is not None for k in ("attachment_point_amount", "limit_amount")) and not ea_src.get("evidence_quote"):
             reasons.append("excess_auto figures have no evidence quote")
+        # FR-7: cover that exists but is narrower in the US than the headline says is an underwriter call, not a fact.
+        if facts["ea_us_restriction"]:
+            reasons.append(f"US excess auto cover is restricted: {facts['ea_us_restriction']}")
 
     # FR-7: low confidence on any displayed value.
     for row in evidence:
