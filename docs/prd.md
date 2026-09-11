@@ -53,7 +53,7 @@ The caseathon asks for a working prototype that shows how such an archive become
 | F1 | **17 of the 19 example PDFs have no text layer** (scans). Only the two 2022-06-08 Danfoss files are text PDFs. | OCR/vision is mandatory on the main path, not a fallback. |
 | F2 | Documents are 2–85 pages (median ~6); mixed languages (EN, DA, FI, SV observed); personal/company identifiers partly redacted (black boxes). | Chunked page processing; extraction must tolerate `null` policyholder. |
 | F3 | Semi-structured header on page 1 (Policy no. `LP…`, Client no. `LC…`, period, print date) followed by free-text cover descriptions. | Header fields are reliable anchors; cover facts need reading, not regex. |
-| F4 | No Anthropic API key or `ant` CLI on the build machine; only the `claude` CLI under a Claude Code Pro subscription. `ANTHROPIC_BASE_URL` is set in the environment. | LLM calls go through `claude -p` (headless). Zero marginal cost, but rate-limited and not a production pattern. |
+| F4 | No Anthropic API key or `ant` CLI on the build machine; only the `claude` CLI under a Claude Code Pro subscription (OAuth login). `ANTHROPIC_BASE_URL` is set but points at the default `https://api.anthropic.com` — no proxy, so the measured timings in F6 are representative and Pro-plan rate limits are the only throttle. | LLM calls go through `claude -p` (headless). Zero marginal cost, but rate-limited and not a production pattern. |
 | F5 | `claude -p` cannot read PDFs directly on this machine (needs poppler). It reads **PNG page images** fine. | Rasterise PDFs in Python (`pypdfium2` + `pillow`), pass page PNGs to Claude. Page images are also needed by the UI (G3), so this is not extra work. |
 | F6 | Measured: 3-page scan → correct structured JSON with page-level evidence quote in ~18 s, ~$0.03 API-equivalent. | 19 docs ≈ 220 pages ≈ 10–15 min sequential ingestion; comfortably inside the time box. |
 | F7 | `uv` works only with `--native-tls` on this network; project `settings.json` denies `pip install`, `uv add`, `uv pip`. | Dependencies declared once in `pyproject.toml`; run everything via `uv run --native-tls`. |
@@ -268,9 +268,10 @@ Cut order if behind: FR-6 (already stretch) → FR-4 follow-up chat reduced to c
 
 ## 14. Open questions
 
-1. Confirm whether `ANTHROPIC_BASE_URL` in the environment points `claude` at a proxy — if so, ingestion latency and limits may differ from the test run.
-2. Does the jury value Swedish UI labels, or is English UI with Swedish question support enough? (Assumed: English UI.)
-3. Should the `Projects/` folder be treated purely as negatives, or is there a 4th use case behind it? (Assumed: negatives.)
+1. Does the jury value Swedish UI labels, or is English UI with Swedish question support enough? (Assumed: English UI.)
+2. Should the `Projects/` folder be treated purely as negatives, or is there a 4th use case behind it? (Assumed: negatives.)
+
+*Resolved:* `ANTHROPIC_BASE_URL` was checked on 2026-09-11 — it is the default `https://api.anthropic.com`, not a proxy (see F4).
 
 ## 15. Glossary
 
