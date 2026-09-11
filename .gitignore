@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Generated at runtime (rebuild with `uv run --native-tls python -m ingest`)
+data/
+
+# Local env / secrets
+.env
+.streamlit/secrets.toml
