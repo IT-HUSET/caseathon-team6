@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)"
+    ],
+    "deny": [
+      "Bash(git reset *)",
+      "Bash(rm -rf *)",
+      "Bash(uv add *)",
+      "Bash(uv remove *)",
+      "Bash(uv pip *)",
+      "Bash(pip install *)",
+      "Edit(uv.lock)",
+      "Read(.env)"
+    ]
+  }
+}
