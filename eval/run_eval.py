@@ -87,6 +87,7 @@ def run() -> int:
 
     tp = fp = fn = tn = 0
     exact_attach = exact_limit = positives = flagged = unlabelled = not_extracted = ambiguous = 0
+    exact_agg = [0, 0]   # matches, scored (only when the ground truth has a limit_aggregate_amount column)
     lines = []
     for g in gt:
         truth = _yn(g.get("has_excess_auto_us"))
@@ -124,8 +125,14 @@ def run() -> int:
                     and _cur(g.get("limit_currency")) == _cur(f.get("ea_limit_currency")))
             exact_attach += a_ok
             exact_limit += l_ok
+            detail_agg = ""
+            if "limit_aggregate_amount" in g:
+                g_ok = _num(g.get("limit_aggregate_amount")) == f.get("ea_limit_aggregate_amount")
+                exact_agg[0] += g_ok
+                exact_agg[1] += 1
+                detail_agg = f"  agg {'OK ' if g_ok else 'BAD'} {f.get('ea_limit_aggregate_amount')}"
             detail = (f"  attach {'OK ' if a_ok else 'BAD'} {f.get('ea_attachment_amount')} {f.get('ea_attachment_currency') or ''}"
-                      f"  limit {'OK ' if l_ok else 'BAD'} {f.get('ea_limit_amount')} {f.get('ea_limit_currency') or ''}")
+                      f"  limit {'OK ' if l_ok else 'BAD'} {f.get('ea_limit_amount')} {f.get('ea_limit_currency') or ''}" + detail_agg)
         missing = "" if f else "  (not in index)"
         flag = "  [needs review]" if f.get("needs_review") else ""
         lines.append(f"{'OK ' if truth == pred else 'BAD'} {g['file']:55} truth={truth!s:5} pred={pred!s:5}{detail}{missing}{flag}")
@@ -137,7 +144,8 @@ def run() -> int:
     print(f"\nscored {labelled}/{len(gt)} rows (unlabelled: {unlabelled}, not extracted: {not_extracted}, '?' either-accepted: {ambiguous})")
     print(f"US excess auto cover:  precision {precision:.2f}  recall {recall:.2f}  (tp={tp} fp={fp} fn={fn} tn={tn})")
     if positives:
-        print(f"exact match on true positives: attachment {exact_attach}/{positives}, limit {exact_limit}/{positives}")
+        print(f"exact match on true positives: attachment {exact_attach}/{positives}, limit {exact_limit}/{positives}"
+              + (f", aggregate {exact_agg[0]}/{exact_agg[1]}" if exact_agg[1] else ""))
     print(f"rows flagged needs_review: {flagged}/{labelled}")
     return 0
 

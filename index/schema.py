@@ -34,6 +34,7 @@ QUERY_FIELDS: dict[str, tuple[str, str, str]] = {
     "ea_attachment_amount":   ("ea_attachment_amount", "number", "Excess auto attachment point (excess point) amount"),
     "ea_attachment_currency": ("ea_attachment_currency", "text", "Currency of the attachment point (ISO code)"),
     "ea_limit_amount":        ("ea_limit_amount", "number", "Excess auto limit amount"),
+    "ea_limit_aggregate_amount": ("ea_limit_aggregate_amount", "number", "Excess auto limit, aggregate per policy period (same currency as the limit); null when the policy states none"),
     "ea_limit_currency":      ("ea_limit_currency", "text", "Currency of the limit (ISO code)"),
     "ea_basis":               ("ea_basis", "text", "Basis of the limit, e.g. 'per occurrence'"),
     "ea_us_restriction":      ("ea_us_restriction", "text", "Restriction on the US excess auto cover as worded in the policy, or null when unrestricted"),
@@ -59,7 +60,7 @@ QUERY_JSON_EXAMPLE = {
     ],
     "columns": ["policy_no", "policyholder", "period_start", "period_end",
                 "ea_attachment_amount", "ea_attachment_currency",
-                "ea_limit_amount", "ea_limit_currency"],
+                "ea_limit_amount", "ea_limit_aggregate_amount", "ea_limit_currency"],
     "group_by": None,
     "aggregate": None,
     "explanation": "Policies with excess auto liability cover in the US, with attachment point and limit.",
@@ -110,6 +111,7 @@ EXTRACTION_EXAMPLE: dict[str, Any] = {
         "attachment_point_amount": 1000000,
         "attachment_point_currency": "USD",
         "limit_amount": 25000000,
+        "limit_aggregate_amount": 50000000,   # aggregate per policy period from the same row; null when none stated
         "limit_currency": "EUR",
         "basis": "per occurrence",
         "notes": "applies to owned/hired/non-owned autos in USA; limit_source: total sum insured",
@@ -186,7 +188,7 @@ def validate_extraction(obj: Any, first_page: int, last_page: int) -> dict[str, 
     if ea is not None:
         if not isinstance(ea, dict):
             raise ExtractionValidationError("excess_auto must be an object or null")
-        for amt in ("attachment_point_amount", "limit_amount"):
+        for amt in ("attachment_point_amount", "limit_amount", "limit_aggregate_amount"):
             if ea.get(amt) is not None and not isinstance(ea[amt], (int, float)):
                 raise ExtractionValidationError(f"excess_auto.{amt} must be a number or null")
         _check_evidence("excess_auto", ea, first_page, last_page)

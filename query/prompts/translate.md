@@ -17,7 +17,7 @@ The question may be in English or Swedish (or another language). Field names in 
 Guidance:
 - "excess auto", "excess automobile", "umbrella over motor", "excess motor" -> `has_excess_auto = true`.
 - "in the US", "United States", "USA", "i USA", "amerikansk" -> `geography_us = true`.
-- "attachment point" / "excess point" / "självrisknivå" -> `ea_attachment_amount` (+ currency); "limit" / "gräns" -> `ea_limit_amount` (+ currency).
+- "attachment point" / "excess point" / "självrisknivå" -> `ea_attachment_amount` (+ currency); "limit" / "gräns" -> `ea_limit_amount` (per occurrence, + currency); "aggregate" / "aggregate limit" / "per period" / "årsaggregat" -> `ea_limit_aggregate_amount`. When the question says just "limit", show both `ea_limit_amount` and `ea_limit_aggregate_amount`.
 - "how many" / "hur många" -> aggregate count. "sum ... by currency" -> aggregate sum grouped by the currency field.
 - Prefer showing `ea_attachment_currency` next to `ea_attachment_amount` and `ea_limit_currency` next to `ea_limit_amount`.
 - If the question needs information the schema does not have (broker, premium, claims, wording text, ...), return `{"unmappable": true, "reason": "..."}` and nothing else.

@@ -31,6 +31,7 @@ EXCESS_AUTO_FIELDS = {
     "attachment_point_amount": "ea_attachment_amount",
     "attachment_point_currency": "ea_attachment_currency",
     "limit_amount": "ea_limit_amount",
+    "limit_aggregate_amount": "ea_limit_aggregate_amount",
     "limit_currency": "ea_limit_currency",
     "basis": "ea_basis",
     "notes": "ea_notes",

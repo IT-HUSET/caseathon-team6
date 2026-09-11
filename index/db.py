@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS policy_facts (
     has_excess_auto         INTEGER,                -- 1 / 0 / NULL
     ea_attachment_amount    REAL,
     ea_attachment_currency  TEXT,
-    ea_limit_amount         REAL,
+    ea_limit_amount         REAL,                   -- per occurrence
+    ea_limit_aggregate_amount REAL,                 -- aggregate per policy period, NULL when none stated
     ea_limit_currency       TEXT,
     ea_basis                TEXT,
     ea_notes                TEXT,
@@ -94,13 +95,14 @@ CREATE TABLE IF NOT EXISTS raw_extractions (
 FACT_COLUMNS = [
     "policy_no", "client_no", "policyholder", "period_start", "period_end", "language",
     "product_line", "geography_scope", "geography_us", "has_excess_auto",
-    "ea_attachment_amount", "ea_attachment_currency", "ea_limit_amount", "ea_limit_currency",
+    "ea_attachment_amount", "ea_attachment_currency", "ea_limit_amount", "ea_limit_aggregate_amount", "ea_limit_currency",
     "ea_basis", "ea_notes", "ea_us_restriction", "needs_review", "review_reasons",
 ]
 
 # Columns added after the first release; applied to existing databases on connect().
 MIGRATIONS = [
     ("policy_facts", "ea_us_restriction", "ALTER TABLE policy_facts ADD COLUMN ea_us_restriction TEXT"),
+    ("policy_facts", "ea_limit_aggregate_amount", "ALTER TABLE policy_facts ADD COLUMN ea_limit_aggregate_amount REAL"),
 ]
 
 

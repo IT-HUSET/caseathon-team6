@@ -105,7 +105,8 @@ the Scale tab prices the production path accordingly (text layer for free, OCR o
 |---|---|
 | US excess auto cover — precision / recall | **1.00 / 1.00** (tp 4, fp 0, fn 0, tn 13) |
 | Attachment point exact match (true positives) | **4 / 4** |
-| Limit exact match (true positives) | **4 / 4** |
+| Limit per occurrence exact match (true positives) | **4 / 4** |
+| Limit aggregate per period exact match (true positives) | **4 / 4** — two are correctly *null* (General Liability row has no aggregate on those schedules) |
 | Rows flagged *Needs review* | 7 / 17 — six negatives with low confidence on *absence* or a missing quote, plus one positive (LP0000036557-30) whose US excess auto cover is scope-restricted |
 | Documents labelled `?` (either answer accepted) | 2 — both prints of LP0000045733-23, whose schedule has no explicit excess-auto clause |
 

@@ -29,12 +29,15 @@ Question (pre-filled):
 
 Expected table — 4 rows, one flagged ⚠️ (LP0000036557-30, see step 3):
 
-| Policy | Period | Attachment | Limit |
-|---|---|---|---|
-| LP0000017479-37 | 2023-07-01 → 2024-06-30 | USD 10,000,000 | USD 50,000,000 |
-| LP0000028602-58 | 2025-10-01 → 2026-09-30 | USD 2,000,000 | USD 50,000,000 |
-| LP0000036557-30 | 2021-06-01 → 2022-05-31 | USD 1,000,000 | SEK 360,000,000 |
-| LP0000043203-21 | 2025-12-01 → 2026-11-30 | USD 5,000,000 | USD 10,000,000 |
+| Policy | Period | Attachment | Limit per occurrence | Limit aggregate |
+|---|---|---|---|---|
+| LP0000017479-37 | 2023-07-01 → 2024-06-30 | USD 10,000,000 | USD 50,000,000 | — (none stated) |
+| LP0000028602-58 | 2025-10-01 → 2026-09-30 | USD 2,000,000 | USD 50,000,000 | — (none stated) |
+| LP0000036557-30 | 2021-06-01 → 2022-05-31 | USD 1,000,000 | SEK 360,000,000 | SEK 360,000,000 |
+| LP0000043203-21 | 2025-12-01 → 2026-11-30 | USD 5,000,000 | USD 10,000,000 | USD 20,000,000 |
+
+The empty aggregates are correct, not misses: on those two schedules the General Liability row has a blank
+aggregate cell (only Products Liability carries 50M/50M) and the extractor was told not to borrow it.
 
 Point at: policyholder is empty because it is *redacted in the scans*, not missed. Expand
 **Query (validated JSON → SQL)**: the model never writes SQL — it fills a whitelisted filter and the app
@@ -45,7 +48,7 @@ builds the SQL. Say: *that is why an answer costs cents regardless of corpus siz
 Four evidenced values, each with page, confidence, verbatim quote and the page image:
 
 - Excess auto: attachment point **USD 5,000,000 — p. 5** — quote *"…that part of the loss that exceeds USD 5 000 000 in the USA…"*
-- Excess auto: limit **USD 10,000,000 — p. 3** — quote *"TOTAL Sum Insured USD 10,000,000"*
+- Excess auto: limit **USD 10,000,000 per occurrence / USD 20,000,000 aggregate — p. 3** — quote *"TOTAL Sum Insured USD 10,000,000 20,000,000"*
 - Cover applies in the US: Yes — p. 5; Has excess auto liability: Yes — p. 5
 
 Say: *every number has a page. The limit comes from the sum-insured table because the auto extension has no
@@ -108,7 +111,7 @@ Drag **Share of archive that is scanned** to 1.0 to show the old assumption: OCR
 move **Share passing Stage 0 triage** to 0.2: everything divides by five. Say: *the archive is read once; queries
 never re-read it. Throughput is a batch/parallelism question, not an architecture question.*
 
-Close with the eval line: **precision 1.00, recall 1.00, attachment 4/4, limit 4/4** against a labelled
+Close with the eval line: **precision 1.00, recall 1.00, attachment 4/4, limit 4/4, aggregate 4/4** against a labelled
 ground truth (`eval/ground_truth.csv`), reproducible with one command.
 
 ## 6. What's next (20 s)

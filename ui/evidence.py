@@ -46,7 +46,11 @@ def _value_text(field: str, facts) -> str:
     if field == "excess_auto":
         return _money(facts["ea_attachment_amount"], facts["ea_attachment_currency"])
     if field == "excess_auto_limit":
-        return _money(facts["ea_limit_amount"], facts["ea_limit_currency"])
+        per = _money(facts["ea_limit_amount"], facts["ea_limit_currency"])
+        agg = facts["ea_limit_aggregate_amount"]
+        if agg is None:
+            return f"{per} per occurrence"
+        return f"{per} per occurrence / {_money(agg, facts['ea_limit_currency'])} aggregate"
     return ""
 
 
@@ -84,7 +88,8 @@ def render(conn: sqlite3.Connection, doc_id: str) -> None:
         if row["field"] in ("excess_auto", "excess_auto_limit") and facts:
             st.markdown(
                 f"Attachment point: **{_money(facts['ea_attachment_amount'], facts['ea_attachment_currency'])}**  \n"
-                f"Limit: **{_money(facts['ea_limit_amount'], facts['ea_limit_currency'])}**  \n"
+                f"Limit per occurrence: **{_money(facts['ea_limit_amount'], facts['ea_limit_currency'])}**  \n"
+                f"Limit aggregate per period: **{_money(facts['ea_limit_aggregate_amount'], facts['ea_limit_currency']) if facts['ea_limit_aggregate_amount'] is not None else 'none stated'}**  \n"
                 f"Basis: {facts['ea_basis'] or '–'}"
             )
     with img_col:
