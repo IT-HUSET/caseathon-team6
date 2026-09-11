@@ -8,6 +8,7 @@ and is idempotent, so both the ingest CLI and the Streamlit app can call
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -71,6 +72,14 @@ CREATE TABLE IF NOT EXISTS ingest_metrics (
     num_turns       INTEGER,
     model           TEXT,
     status          TEXT                             -- ok | extraction_failed | cli_failed
+);
+
+CREATE TABLE IF NOT EXISTS query_cache (
+    question_norm  TEXT PRIMARY KEY,
+    question       TEXT NOT NULL,
+    query_json     TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    hits           INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS raw_extractions (
@@ -181,6 +190,40 @@ def save_raw_extraction(conn: sqlite3.Connection, doc_id: str, chunk_index: int,
 def clear_chunk_data(conn: sqlite3.Connection, doc_id: str) -> None:
     conn.execute("DELETE FROM ingest_metrics WHERE doc_id = ?", (doc_id,))
     conn.execute("DELETE FROM raw_extractions WHERE doc_id = ?", (doc_id,))
+    conn.commit()
+
+
+# --- query cache (FR-3 latency) ---------------------------------------------
+
+def normalise_question(question: str) -> str:
+    """Cache key: trimmed, lower-cased, whitespace collapsed, trailing punctuation removed."""
+    q = re.sub(r"\s+", " ", question.strip().lower())
+    return q.rstrip(" .?!,;:")
+
+
+def cache_get(conn: sqlite3.Connection, question: str) -> str | None:
+    """Return the cached query JSON (and count the hit), or None."""
+    key = normalise_question(question)
+    row = conn.execute("SELECT query_json FROM query_cache WHERE question_norm = ?", (key,)).fetchone()
+    if row is None:
+        return None
+    conn.execute("UPDATE query_cache SET hits = hits + 1 WHERE question_norm = ?", (key,))
+    conn.commit()
+    return row["query_json"]
+
+
+def cache_put(conn: sqlite3.Connection, question: str, query_json: str) -> None:
+    conn.execute(
+        """INSERT INTO query_cache (question_norm, question, query_json, created_at, hits)
+           VALUES (?, ?, ?, ?, 0)
+           ON CONFLICT(question_norm) DO UPDATE SET query_json = excluded.query_json, created_at = excluded.created_at""",
+        (normalise_question(question), question.strip(), query_json, utcnow()),
+    )
+    conn.commit()
+
+
+def cache_delete(conn: sqlite3.Connection, question: str) -> None:
+    conn.execute("DELETE FROM query_cache WHERE question_norm = ?", (normalise_question(question),))
     conn.commit()
 
 

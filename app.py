@@ -35,6 +35,7 @@ ss.setdefault("result", None)         # current ResultSet
 ss.setdefault("chat", [])             # list[chat.ChatTurn]
 ss.setdefault("selected_doc", None)
 ss.setdefault("notice", None)
+ss.setdefault("cached", False)
 
 st.title("Policy Insight")
 st.caption("Natural-language questions over If Industrial policy documents — every value traceable to a page.")
@@ -61,6 +62,7 @@ with tab_ask:
             ss.query = ss.result = None
         else:
             ss.notice = None
+            ss.cached = t.cached
             run_query(t.query)
 
     if ss.notice:
@@ -73,7 +75,7 @@ with tab_ask:
     if ss.result is not None:
         res = ss.result
         if res.explanation:
-            st.markdown(f"*{res.explanation}*")
+            st.markdown(f"*{res.explanation}*" + ("  ·  `cached translation`" if ss.cached else ""))
         df = pd.DataFrame(res.rows, columns=res.columns)
 
         if ss.query and not ss.query.is_aggregate:

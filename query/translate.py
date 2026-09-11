@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import config
+from index import db
 from index.schema import schema_for_prompt
 from ingest.claude_cli import ClaudeCLIError, run_claude
 from query.execute import InvalidQuery, Query, validate
@@ -40,6 +41,7 @@ class Translation:
     unmappable_reason: str | None
     raw: Any
     metrics: dict[str, Any]
+    cached: bool = False
 
 
 def build_prompt(question: str) -> str:
@@ -55,7 +57,18 @@ def log_query(kind: str, question: str, payload: Any, metrics: dict[str, Any]) -
                             "metrics": metrics}, ensure_ascii=False, default=str) + "\n")
 
 
-def translate(question: str, model: str | None = None) -> Translation:
+def translate(question: str, model: str | None = None, use_cache: bool = True) -> Translation:
+    """NL question -> Translation. Identical questions are served from `query_cache`
+    (only successful, validated translations are cached; unmappable/failed never are)."""
+    conn = db.connect()
+    if use_cache:
+        cached = db.cache_get(conn, question)
+        if cached is not None:
+            raw = json.loads(cached)
+            try:
+                return Translation(validate(raw), None, raw, {"cached": True}, cached=True)
+            except InvalidQuery:
+                db.cache_delete(conn, question)   # schema changed since it was cached; re-translate
     try:
         res = run_claude(build_prompt(question), model=model, tools=None,
                          json_schema=TRANSLATE_JSON_SCHEMA, max_turns=1, effort="low")
@@ -69,6 +82,8 @@ def translate(question: str, model: str | None = None) -> Translation:
     if res.data.get("unmappable"):
         return Translation(None, res.data.get("reason") or "Not answerable from the index.", res.data, res.metrics)
     try:
-        return Translation(validate(res.data), None, res.data, res.metrics)
+        q = validate(res.data)
     except InvalidQuery as e:
         return Translation(None, f"The model proposed a query outside the schema: {e}", res.data, res.metrics)
+    db.cache_put(conn, question, json.dumps(res.data, ensure_ascii=False))
+    return Translation(q, None, res.data, res.metrics)

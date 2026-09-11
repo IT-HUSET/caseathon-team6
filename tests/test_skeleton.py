@@ -69,7 +69,7 @@ def test_merge_first_non_null_header_and_positive_wins():
     assert facts["ea_limit_currency"] == "EUR"
     assert facts["needs_review"] == 0
     fields = {e["field"] for e in evidence}
-    assert fields == {"geography_us", "has_excess_auto", "excess_auto"}
+    assert fields == {"geography_us", "has_excess_auto", "excess_auto", "excess_auto_limit"}
 
 
 def test_merge_flags_low_confidence_missing_quote_and_failed_chunk():
@@ -143,3 +143,20 @@ def test_merge_treats_string_null_as_missing():
     d = {**EXTRACTION_EXAMPLE, "policyholder": "null", "client_no": ""}
     facts, _ = merge_chunks([_chunk(0, 1, 5, d)])
     assert facts["policyholder"] is None and facts["client_no"] is None
+
+
+def test_query_cache_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "c.sqlite")
+    conn = db.connect(config.DB_PATH)
+    assert db.normalise_question("  Sum   the limits by currency?! ") == "sum the limits by currency"
+    assert db.cache_get(conn, "Sum the limits") is None
+    db.cache_put(conn, "Sum the limits", '{"columns": ["policy_no"]}')
+    assert db.cache_get(conn, "sum the limits.") == '{"columns": ["policy_no"]}'
+    assert conn.execute("SELECT hits FROM query_cache").fetchone()[0] == 1
+
+
+def test_detect_language():
+    from query.chat import detect_language
+    assert detect_language("Sum the limits by currency.") == "en"
+    assert detect_language("Summera limiterna per valuta.") == "sv"
+    assert detect_language("Hur många policyer har excess auto-täckning i USA?") == "sv"

@@ -134,7 +134,7 @@ def run() -> int:
     labelled = len(gt) - unlabelled - not_extracted - ambiguous
     precision = tp / (tp + fp) if tp + fp else float("nan")
     recall = tp / (tp + fn) if tp + fn else float("nan")
-    print(f"\nscored {labelled}/{len(gt)} rows (unlabelled: {unlabelled}, not extracted: {not_extracted})")
+    print(f"\nscored {labelled}/{len(gt)} rows (unlabelled: {unlabelled}, not extracted: {not_extracted}, '?' either-accepted: {ambiguous})")
     print(f"US excess auto cover:  precision {precision:.2f}  recall {recall:.2f}  (tp={tp} fp={fp} fn={fn} tn={tn})")
     if positives:
         print(f"exact match on true positives: attachment {exact_attach}/{positives}, limit {exact_limit}/{positives}")

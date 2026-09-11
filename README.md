@@ -92,6 +92,25 @@ Text PDFs and scans take the same path (page images), so nothing else changes.
 4. **Scale.** The Scale tab shows measured seconds/tokens/cost per document from the actual run and extrapolates
    to 200M documents under editable assumptions.
 
+## Results on the example corpus (2026-09-11)
+
+`eval/run_eval.py` against `eval/ground_truth.csv`, after ingesting all 19 documents (226 pages, 17 of them scans):
+
+| Metric | Result |
+|---|---|
+| US excess auto cover — precision / recall | **1.00 / 1.00** (tp 4, fp 0, fn 0, tn 13) |
+| Attachment point exact match (true positives) | **4 / 4** |
+| Limit exact match (true positives) | **4 / 4** |
+| Rows flagged *Needs review* | 6 / 17 — all negatives with low confidence on *absence* or a missing quote |
+| Documents labelled `?` (either answer accepted) | 2 — both prints of LP0000045733-23, whose schedule has no explicit excess-auto clause |
+
+Ground-truth provenance is recorded per row in the `labelled_by` column: 2 rows verified by an underwriter,
+3 with the decisive page checked by eye, 14 negatives from a model-assisted read. Treat the negatives as
+"reviewed, not audited"; the positives are the ones that were actually checked against the page.
+
+Measured ingestion cost (Scale tab): median 8 pages/doc, p50 27 s/doc, ≈ $0.18/doc API-equivalent via the CLI
+(inflated by Claude Code prompt overhead; the API path is estimated at ≈ $0.02/doc).
+
 ## Known limitations
 
 - Prototype drives the Claude Code CLI under a subscription: rate-limited, and `total_cost_usd` is an
@@ -101,3 +120,5 @@ Text PDFs and scans take the same path (page images), so nothing else changes.
   (`data/index.sqlite`, `data/pages/`).
 - No highlight boxes on page images (stretch goal FR-6); the quote is the source of truth.
 - Streamlit's row selection requires a recent Streamlit (≥1.35).
+- On some Windows machines pytest cannot create its default temp dir; run
+  `uv run --native-tls pytest -p no:cacheprovider --basetemp=<writable folder>`.
