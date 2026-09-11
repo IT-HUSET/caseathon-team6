@@ -64,12 +64,27 @@ def parse_json_payload(text: str) -> Any:
     raise json.JSONDecodeError("no JSON object found in model output", text, 0)
 
 
+def _dominant_model(model_usage: dict[str, Any]) -> str | None:
+    """The model that did the work, not whichever key happens to come first.
+
+    `claude -p` reports every model the CLI touched: a small auxiliary call (Haiku,
+    fractions of a cent) sits alongside the model that actually ran the extraction.
+    `next(iter(...))` picked the auxiliary one, mislabelling the run and every cost
+    figure derived from it -- and labelling the model is the whole point of the
+    measured row on the Scale tab (PRD F16). Rank by cost, fall back to tokens.
+    """
+    def weight(usage: Any) -> tuple[float, float]:
+        usage = usage if isinstance(usage, dict) else {}
+        return (usage.get("costUSD") or 0,
+                (usage.get("inputTokens") or 0) + (usage.get("outputTokens") or 0))
+
+    return max(model_usage, key=lambda name: weight(model_usage[name])) if model_usage else None
+
+
 def _metrics_from_envelope(env: dict[str, Any]) -> dict[str, Any]:
     usage = env.get("usage") or {}
-    model = None
     model_usage = env.get("modelUsage") or {}
-    if isinstance(model_usage, dict) and model_usage:
-        model = next(iter(model_usage))
+    model = _dominant_model(model_usage) if isinstance(model_usage, dict) else None
     return {
         "duration_ms": env.get("duration_ms"),
         "duration_api_ms": env.get("duration_api_ms"),

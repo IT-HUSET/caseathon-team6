@@ -10,7 +10,7 @@ import pytest
 import config
 from index import db
 from index.schema import ExtractionValidationError, validate_extraction, EXTRACTION_EXAMPLE
-from ingest.claude_cli import parse_json_payload, strip_fences
+from ingest.claude_cli import _metrics_from_envelope, parse_json_payload, strip_fences
 from ingest.extract import ChunkResult, chunk_pages
 from ingest.merge import merge_chunks
 from query.execute import InvalidQuery, build_sql, execute, validate
@@ -160,3 +160,31 @@ def test_detect_language():
     assert detect_language("Sum the limits by currency.") == "en"
     assert detect_language("Summera limiterna per valuta.") == "sv"
     assert detect_language("Hur många policyer har excess auto-täckning i USA?") == "sv"
+
+
+def test_metrics_record_the_model_that_did_the_work():
+    """`claude -p` reports an auxiliary model alongside the one that ran the work.
+
+    Envelope shape captured from a real `claude -p --model claude-sonnet-5` call:
+    Haiku is listed first and costs $0.001, Sonnet costs $0.050. Recording the
+    first key labelled every run "haiku" and mispriced the Scale tab's measured row.
+    """
+    env = {
+        "usage": {"input_tokens": 899, "output_tokens": 16},
+        "total_cost_usd": 0.0509848,
+        "num_turns": 1,
+        "modelUsage": {
+            "claude-haiku-4-5-20251001": {"inputTokens": 897, "outputTokens": 12, "costUSD": 0.000957},
+            "claude-sonnet-5": {"inputTokens": 2, "outputTokens": 4, "costUSD": 0.0500278},
+        },
+    }
+    assert _metrics_from_envelope(env)["model"] == "claude-sonnet-5"
+
+    # Ties on cost fall back to tokens; a single model is returned unchanged.
+    one = {"modelUsage": {"claude-sonnet-5": {"inputTokens": 10, "outputTokens": 1}}}
+    assert _metrics_from_envelope(one)["model"] == "claude-sonnet-5"
+
+    # Missing, empty or malformed usage must not raise -- metrics are observability,
+    # never a reason to fail an otherwise good extraction.
+    for env in ({}, {"modelUsage": {}}, {"modelUsage": None}, {"modelUsage": {"m": None}}):
+        _metrics_from_envelope(env)
