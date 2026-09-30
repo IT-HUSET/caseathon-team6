@@ -1,6 +1,6 @@
 # One-shot setup for Policy Insight on Windows. Run via setup.cmd (double-click) or:
 #   powershell -ExecutionPolicy Bypass -File setup.ps1
-# Installs uv (which fetches Python 3.13 itself) and the Claude CLI if missing, then syncs dependencies.
+# Installs Git for Windows, uv (which fetches Python 3.13 itself) and the Claude CLI if missing, then syncs dependencies.
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
@@ -15,6 +15,14 @@ if (-not (Have uv)) {
     Write-Host '==> Installing uv' -ForegroundColor Cyan
     Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
     Refresh-Path
+}
+if (-not (Have git)) {
+    # Claude CLI on native Windows needs Git for Windows (Git Bash).
+    if (-not (Have winget)) { throw 'Git for Windows is required. Install it from https://git-scm.com/download/win and re-run.' }
+    Write-Host '==> Installing Git for Windows' -ForegroundColor Cyan
+    winget install --id Git.Git -e --silent --accept-package-agreements --accept-source-agreements
+    Refresh-Path
+    $env:Path += ';C:\Program Files\Git\cmd'
 }
 if (-not (Have claude)) {
     Write-Host '==> Installing Claude CLI' -ForegroundColor Cyan
