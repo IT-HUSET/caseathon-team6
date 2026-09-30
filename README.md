@@ -13,6 +13,12 @@ Caseathon prototype for If Industrial. Scope: use case Q1 on the 19 example poli
 - The `claude` CLI (Claude Code), logged in. All LLM calls go through `claude -p` headlessly — no API key needed.
   In production the same prompts run on the Anthropic API / Batch API unchanged.
 
+## Windows quick start
+
+On a fresh Windows machine, double-click `setup.cmd` (or run `powershell -ExecutionPolicy Bypass -File setup.ps1`).
+It installs `uv` (which fetches Python 3.13) and the Claude CLI if missing, runs `uv sync`, and checks that `claude` is
+logged in. If it isn't, run `claude` once and sign in with your Claude Pro account, then re-run the script.
+
 ## Run it
 
 ```bash
