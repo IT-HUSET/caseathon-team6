@@ -33,8 +33,8 @@ PARSE_RETRIES = 1                                                # invalid JSON 
 # --- Claude CLI (F4: headless `claude -p`, no API key on this machine) ------
 # Resolved to the full executable path so subprocess needs no shell (see ingest/claude_cli.py).
 CLAUDE_BIN = shutil.which(os.environ.get("PI_CLAUDE_BIN", "claude")) or "claude"
-# PRD s10 prices the prototype path with Sonnet 5; override with PI_MODEL (e.g. claude-opus-5).
-MODEL = os.environ.get("PI_MODEL", "claude-sonnet-5")
+# Default is Sonnet 5.5 (same price as Sonnet 5 in PRD s10); override with PI_MODEL (e.g. claude-opus-5-5).
+MODEL = os.environ.get("PI_MODEL", "claude-sonnet-5-5")
 CLI_TIMEOUT_S = int(os.environ.get("PI_CLI_TIMEOUT_S", "600"))
 
 # --- Scale tab defaults (PRD s10; list prices Sept 2026 - re-check before use) ---
@@ -54,7 +54,9 @@ SCALE_DEFAULTS = {
 }
 
 MODEL_PRICES_PER_MTOK = {            # (input, output) USD per 1M tokens
+    "claude-opus-5-5": (4.0, 20.0),
     "claude-opus-5": (5.0, 25.0),
+    "claude-sonnet-5-5": (2.0, 10.0),
     "claude-sonnet-5": (2.0, 10.0),
     "claude-haiku-4-5": (1.0, 5.0),
 }
