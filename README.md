@@ -19,7 +19,15 @@ On a fresh Windows machine, double-click `setup.cmd` (or run `powershell -Execut
 It installs Git for Windows (via winget), `uv` (which fetches Python 3.13) and the Claude CLI if missing, runs `uv sync`, and checks that `claude` is
 logged in. If it isn't, run `claude` once and sign in with your Claude Pro account, then re-run the script.
 
-Afterwards, double-click `ingest.bat` (extra args pass through, e.g. `ingest.bat --limit 2`) and `run-app.bat`.
+Then skip the 10–15 min ingest by using the pre-built index in `data.zip` (committed in the repo root). Extract it into the
+repo root so that `data/` ends up next to `app.py`:
+
+```powershell
+Expand-Archive data.zip -DestinationPath . -Force
+```
+
+Then double-click `run-app.bat` to launch the UI. Only run `ingest.bat` (extra args pass through, e.g. `ingest.bat --limit 2`)
+if you want to rebuild the index yourself; it uses your Claude quota.
 
 ## Run it
 
